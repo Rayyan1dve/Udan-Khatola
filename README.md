@@ -1,1 +1,503 @@
-# Udan-Khatola
+# Udan-Kh<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forest Flappy Bird Game</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            background: #2c3e50;
+            font-family: 'Arial', sans-serif;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background: #87CEEB;
+        }
+        .game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+        .hidden {
+            display: none;
+        }
+        .btn {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            background-color: #45a049;
+            transform: scale(1.05);
+        }
+        .score-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            z-index: 5;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 flex items-center justify-center min-h-screen">
+    <div class="game-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="startScreen" class="overlay">
+            <h1 class="text-4xl text-white font-bold mb-8">Forest Flappy Bird</h1>
+            <button id="startButton" class="btn">Start Game</button>
+        </div>
+        
+        <div id="gameOverScreen" class="overlay hidden">
+            <h2 class="text-3xl text-white font-bold mb-4">Game Over!</h2>
+            <p id="finalScore" class="text-2xl text-white mb-6">Score: 0</p>
+            <p id="highScore" class="text-xl text-white mb-6">High Score: 0</p>
+            <button id="restartButton" class="btn">Play Again</button>
+        </div>
+        
+        <div class="score-container">
+            <p id="scoreText">Score: 0</p>
+        </div>
+    </div>
+
+    <!-- Audio elements -->
+    <audio id="jumpSound" src="https://cdn.jsdelivr.net/gh/freeCodeCamp/cdn/audio/beep.mp3" preload="auto"></audio>
+    <audio id="pointSound" src="https://cdn.jsdelivr.net/gh/freeCodeCamp/cdn/audio/click.mp3" preload="auto"></audio>
+    <audio id="hitSound" src="https://cdn.jsdelivr.net/gh/freeCodeCamp/cdn/audio/fail.mp3" preload="auto"></audio>
+    <audio id="backgroundMusic" src="https://cdn.jsdelivr.net/gh/freeCodeCamp/cdn/audio/drum-roll.mp3" loop preload="auto"></audio>
+
+    <script>
+        // Game variables
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const startButton = document.getElementById('startButton');
+        const restartButton = document.getElementById('restartButton');
+        const scoreText = document.getElementById('scoreText');
+        const finalScore = document.getElementById('finalScore');
+        const highScoreText = document.getElementById('highScore');
+        
+        // Audio elements
+        const jumpSound = document.getElementById('jumpSound');
+        const pointSound = document.getElementById('pointSound');
+        const hitSound = document.getElementById('hitSound');
+        const backgroundMusic = document.getElementById('backgroundMusic');
+        
+        // Game constants
+        const GRAVITY = 0.5;
+        const JUMP_FORCE = -10;
+        const BIRD_WIDTH = 40;
+        const BIRD_HEIGHT = 30;
+        const POLE_WIDTH = 60;
+        const POLE_GAP = 200;
+        const POLE_SPEED = 3;
+        const POLE_INTERVAL = 120;
+        const CLOUD_SPEED = 1;
+        
+        // Game state
+        let bird = {
+            x: canvas.width / 4,
+            y: canvas.height / 2,
+            width: BIRD_WIDTH,
+            height: BIRD_HEIGHT,
+            velocity: 0
+        };
+        
+        let poles = [];
+        let clouds = [];
+        let score = 0;
+        let highScore = 0;
+        let frameCount = 0;
+        let isGameOver = false;
+        let gameStarted = false;
+        let polesPassed = 0;
+        
+        // Bird colors and animation
+        const birdColors = {
+            body: '#e74c3c',
+            wing: '#c0392b',
+            beak: '#f39c12',
+            eye: '#2c3e50',
+            pupil: '#ffffff'
+        };
+        
+        let wingPosition = 0;
+        let wingDirection = 1;
+        
+        // Initialize clouds
+        function initClouds() {
+            clouds = [];
+            for (let i = 0; i < 6; i++) {
+                clouds.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * (canvas.height / 2),
+                    width: 60 + Math.random() * 60,
+                    height: 30 + Math.random() * 20,
+                    speed: 0.5 + Math.random() * 1
+                });
+            }
+        }
+        
+        // Reset game state
+        function resetGame() {
+            bird = {
+                x: canvas.width / 4,
+                y: canvas.height / 2,
+                width: BIRD_WIDTH,
+                height: BIRD_HEIGHT,
+                velocity: 0
+            };
+            
+            poles = [];
+            score = 0;
+            frameCount = 0;
+            isGameOver = false;
+            polesPassed = 0;
+            scoreText.textContent = `Score: ${score}`;
+            initClouds();
+        }
+        
+        // Start the game
+        function startGame() {
+            resetGame();
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            gameStarted = true;
+            backgroundMusic.play();
+            gameLoop();
+        }
+        
+        // Game over function
+        function gameOver() {
+            isGameOver = true;
+            gameStarted = false;
+            hitSound.play();
+            backgroundMusic.pause();
+            backgroundMusic.currentTime = 0;
+            
+            if (score > highScore) {
+                highScore = score;
+            }
+            
+            finalScore.textContent = `Score: ${score}`;
+            highScoreText.textContent = `High Score: ${highScore}`;
+            gameOverScreen.classList.remove('hidden');
+        }
+        
+        // Create a new pole pair
+        function createPole() {
+            const gapPosition = Math.random() * (canvas.height - POLE_GAP - 200) + 100;
+            
+            poles.push({
+                x: canvas.width,
+                topHeight: gapPosition,
+                bottomY: gapPosition + POLE_GAP,
+                passed: false
+            });
+        }
+        
+        // Draw a wooden pole
+        function drawPole(x, topHeight, bottomY) {
+            // Draw top pole (wooden texture)
+            const poleGradient = ctx.createLinearGradient(x, 0, x + POLE_WIDTH, 0);
+            poleGradient.addColorStop(0, '#8B4513');  // SaddleBrown
+            poleGradient.addColorStop(0.5, '#A0522D'); // Sienna
+            poleGradient.addColorStop(1, '#8B4513');  // SaddleBrown
+            
+            ctx.fillStyle = poleGradient;
+            ctx.fillRect(x, 0, POLE_WIDTH, topHeight);
+            ctx.fillRect(x, bottomY, POLE_WIDTH, canvas.height - bottomY);
+            
+            // Wooden texture
+            ctx.strokeStyle = '#6B3E26';
+            for (let i = 0; i < 5; i++) {
+                ctx.beginPath();
+                ctx.moveTo(x, i * 30);
+                ctx.lineTo(x + POLE_WIDTH, i * 30);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(x, bottomY + i * 30);
+                ctx.lineTo(x + POLE_WIDTH, bottomY + i * 30);
+                ctx.stroke();
+            }
+            
+            // Top and bottom caps
+            ctx.fillStyle = '#6B3E26';
+            ctx.fillRect(x - 5, topHeight - 15, POLE_WIDTH + 10, 15);
+            ctx.fillRect(x - 5, bottomY, POLE_WIDTH + 10, 15);
+        }
+        
+        // Draw a cloud
+        function drawCloud(x, y, width, height) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.beginPath();
+            ctx.arc(x, y + height/2, height/2, 0, Math.PI * 2);
+            ctx.arc(x + width/3, y + height/2 - 5, height/2, 0, Math.PI * 2);
+            ctx.arc(x + width*2/3, y + height/2, height/2, 0, Math.PI * 2);
+            ctx.arc(x + width, y + height/2, height/2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Draw the bird
+        function drawBird() {
+            // Update wing animation
+            wingPosition += 0.2 * wingDirection;
+            if (wingPosition > 5 || wingPosition < 0) {
+                wingDirection *= -1;
+            }
+            
+            // Body
+            ctx.fillStyle = birdColors.body;
+            ctx.beginPath();
+            ctx.ellipse(bird.x, bird.y, bird.width / 2, bird.height / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Wing
+            ctx.fillStyle = birdColors.wing;
+            ctx.beginPath();
+            ctx.ellipse(
+                bird.x - 5, 
+                bird.y + wingPosition, 
+                bird.width / 3, 
+                bird.height / 4, 
+                Math.PI / 4, 
+                0, 
+                Math.PI * 2
+            );
+            ctx.fill();
+            
+            // Beak
+            ctx.fillStyle = birdColors.beak;
+            ctx.beginPath();
+            ctx.moveTo(bird.x + bird.width / 2, bird.y);
+            ctx.lineTo(bird.x + bird.width / 2 + 15, bird.y - 5);
+            ctx.lineTo(bird.x + bird.width / 2 + 15, bird.y + 5);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Eye
+            ctx.fillStyle = birdColors.eye;
+            ctx.beginPath();
+            ctx.arc(bird.x + 10, bird.y - 5, 5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Pupil
+            ctx.fillStyle = birdColors.pupil;
+            ctx.beginPath();
+            ctx.arc(bird.x + 11, bird.y - 6, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Draw background
+        function drawBackground() {
+            // Sky gradient
+            const skyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            skyGradient.addColorStop(0, '#1e90ff'); // DodgerBlue
+            skyGradient.addColorStop(1, '#87ceeb'); // SkyBlue
+            ctx.fillStyle = skyGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Sun
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.arc(700, 80, 50, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Ground
+            const groundGradient = ctx.createLinearGradient(0, canvas.height - 100, 0, canvas.height);
+            groundGradient.addColorStop(0, '#228B22'); // ForestGreen
+            groundGradient.addColorStop(1, '#006400'); // DarkGreen
+            ctx.fillStyle = groundGradient;
+            ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+            
+            // Clouds
+            clouds.forEach(cloud => {
+                drawCloud(cloud.x, cloud.y, cloud.width, cloud.height);
+                // Move clouds
+                cloud.x -= cloud.speed;
+                
+                // Reset cloud position when it moves off screen
+                if (cloud.x + cloud.width < 0) {
+                    cloud.x = canvas.width + Math.random() * 100;
+                    cloud.y = Math.random() * (canvas.height / 2);
+                }
+            });
+            
+            // Distant trees
+            for (let i = 0; i < 10; i++) {
+                const x = (i * 90) % canvas.width;
+                const y = canvas.height - 100;
+                
+                // Tree trunk
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(x + 10, y - 40, 10, 40);
+                
+                // Tree foliage
+                ctx.fillStyle = '#006400';
+                ctx.beginPath();
+                ctx.moveTo(x, y - 30);
+                ctx.lineTo(x + 30, y - 30);
+                ctx.lineTo(x + 15, y - 80);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.moveTo(x, y - 50);
+                ctx.lineTo(x + 30, y - 50);
+                ctx.lineTo(x + 15, y - 100);
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+        
+        // Update game state
+        function update() {
+            if (isGameOver) return;
+            
+            // Apply gravity to bird
+            bird.velocity += GRAVITY;
+            bird.y += bird.velocity;
+            
+            // Check for collision with ground or ceiling
+            if (bird.y + bird.height / 2 > canvas.height - 100) {
+                bird.y = canvas.height - 100 - bird.height / 2;
+                gameOver();
+            } else if (bird.y - bird.height / 2 < 0) {
+                bird.y = bird.height / 2;
+                bird.velocity = 0;
+            }
+            
+            // Create new poles at interval
+            if (frameCount % POLE_INTERVAL === 0) {
+                createPole();
+            }
+            
+            // Update poles and check for collisions
+            for (let i = 0; i < poles.length; i++) {
+                const pole = poles[i];
+                pole.x -= POLE_SPEED;
+                
+                // Check for passing a pole
+                if (!pole.passed && pole.x + POLE_WIDTH < bird.x - bird.width / 2) {
+                    pole.passed = true;
+                    score++;
+                    scoreText.textContent = `Score: ${score}`;
+                    pointSound.currentTime = 0;
+                    pointSound.play();
+                }
+                
+                // Check for collision with poles
+                if (
+                    bird.x + bird.width / 2 > pole.x && 
+                    bird.x - bird.width / 2 < pole.x + POLE_WIDTH
+                ) {
+                    // Check vertical collision
+                    if (
+                        bird.y - bird.height / 2 < pole.topHeight || 
+                        bird.y + bird.height / 2 > pole.bottomY
+                    ) {
+                        gameOver();
+                    }
+                }
+                
+                // Remove poles that are off screen
+                if (pole.x + POLE_WIDTH < 0) {
+                    poles.splice(i, 1);
+                    i--;
+                }
+            }
+            
+            frameCount++;
+        }
+        
+        // Render game
+        function render() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw background
+            drawBackground();
+            
+            // Draw poles
+            poles.forEach(pole => {
+                drawPole(pole.x, pole.topHeight, pole.bottomY);
+            });
+            
+            // Draw bird
+            drawBird();
+        }
+        
+        // Game loop
+        function gameLoop() {
+            update();
+            render();
+            
+            if (gameStarted) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+        
+        // Initialize clouds
+        initClouds();
+        
+        // Event listeners
+        startButton.addEventListener('click', startGame);
+        restartButton.addEventListener('click', startGame);
+        
+        // Jump on click or spacebar
+        function jump() {
+            if (isGameOver) return;
+            
+            bird.velocity = JUMP_FORCE;
+            jumpSound.currentTime = 0;
+            jumpSound.play();
+        }
+        
+        canvas.addEventListener('click', jump);
+        document.addEventListener('keydown', function(e) {
+            if (e.code === 'Space') {
+                jump();
+                
+                // Start game if not already started
+                if (!gameStarted && !isGameOver) {
+                    startGame();
+                }
+            }
+        });
+        
+        // Initial render
+        render();
+    </script>
+</body>
+</html>
+
+atola
